@@ -36,11 +36,28 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-export const storage = getStorage(app)
+const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId,
+)
+
+if (!isFirebaseConfigured && typeof window !== "undefined") {
+  console.warn("[v0] Firebase configuration is missing. Please add Firebase environment variables.")
+}
+
+// Initialize Firebase only if configured
+let app: ReturnType<typeof initializeApp> | null = null
+let auth: ReturnType<typeof getAuth> | null = null
+let db: ReturnType<typeof getFirestore> | null = null
+let storage: ReturnType<typeof getStorage> | null = null
+
+if (isFirebaseConfigured) {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+  auth = getAuth(app)
+  db = getFirestore(app)
+  storage = getStorage(app)
+}
+
+export { auth, db, storage }
 
 export const googleProvider = new GoogleAuthProvider()
 
@@ -179,7 +196,7 @@ export interface VerificationSubmission {
 // Auth functions
 export async function signIn(email: string, password: string) {
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password)
+    const userCredential = await signInWithEmailAndPassword(auth as any, email, password)
     return { user: userCredential.user, error: null }
   } catch (error: unknown) {
     const firebaseError = error as { code?: string; message?: string }
@@ -189,7 +206,7 @@ export async function signIn(email: string, password: string) {
 
 export async function signInWithGoogle() {
   try {
-    const result = await signInWithPopup(auth, googleProvider)
+    const result = await signInWithPopup(auth as any, googleProvider)
     const user = result.user
 
     // Check if user profile exists
@@ -213,7 +230,7 @@ export async function signInWithGoogle() {
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp,
       }
-      await setDoc(doc(db, "users", user.uid), userProfile)
+      await setDoc(doc(db as any, "users", user.uid), userProfile)
     }
 
     return { user, error: null }
@@ -225,7 +242,7 @@ export async function signInWithGoogle() {
 
 export async function signUp(email: string, password: string, name: string) {
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+    const userCredential = await createUserWithEmailAndPassword(auth as any, email, password)
     const user = userCredential.user
 
     // Create user profile in Firestore
@@ -246,7 +263,7 @@ export async function signUp(email: string, password: string, name: string) {
       updatedAt: serverTimestamp() as Timestamp,
     }
 
-    await setDoc(doc(db, "users", user.uid), userProfile)
+    await setDoc(doc(db as any, "users", user.uid), userProfile)
 
     return { user, error: null }
   } catch (error: unknown) {
@@ -257,7 +274,7 @@ export async function signUp(email: string, password: string, name: string) {
 
 export async function logOut() {
   try {
-    await signOut(auth)
+    await signOut(auth as any)
     return { error: null }
   } catch (error: unknown) {
     const firebaseError = error as { code?: string; message?: string }
@@ -268,7 +285,7 @@ export async function logOut() {
 // User functions
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   try {
-    const docRef = doc(db, "users", userId)
+    const docRef = doc(db as any, "users", userId)
     const docSnap = await getDoc(docRef)
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() } as UserProfile
@@ -281,7 +298,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
 export async function updateUserProfile(userId: string, data: Partial<UserProfile>) {
   try {
-    const docRef = doc(db, "users", userId)
+    const docRef = doc(db as any, "users", userId)
     await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() })
     return { error: null }
   } catch (error: unknown) {
@@ -292,7 +309,7 @@ export async function updateUserProfile(userId: string, data: Partial<UserProfil
 
 export async function getAllUsers(): Promise<UserProfile[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, "users"))
+    const querySnapshot = await getDocs(collection(db as any, "users"))
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as UserProfile)
   } catch {
     return []
@@ -302,7 +319,7 @@ export async function getAllUsers(): Promise<UserProfile[]> {
 // Verification functions
 export async function submitVerification(data: Omit<VerificationSubmission, "id" | "submittedAt" | "status">) {
   try {
-    const docRef = doc(collection(db, "verifications"))
+    const docRef = doc(collection(db as any, "verifications"))
     const verification: Omit<VerificationSubmission, "id"> = {
       ...data,
       status: "under-review",
@@ -330,7 +347,7 @@ export async function submitVerification(data: Omit<VerificationSubmission, "id"
 
 export async function getVerifications(): Promise<VerificationSubmission[]> {
   try {
-    const q = query(collection(db, "verifications"), orderBy("submittedAt", "desc"))
+    const q = query(collection(db as any, "verifications"), orderBy("submittedAt", "desc"))
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as VerificationSubmission)
   } catch {
@@ -345,7 +362,7 @@ export async function updateVerificationStatus(
   reviewedBy: string,
 ) {
   try {
-    const docRef = doc(db, "verifications", verificationId)
+    const docRef = doc(db as any, "verifications", verificationId)
     await updateDoc(docRef, {
       status,
       reviewedAt: serverTimestamp(),
@@ -377,7 +394,7 @@ export async function updateVerificationStatus(
 // Task functions
 export async function getTasks(): Promise<Task[]> {
   try {
-    const q = query(collection(db, "tasks"), where("isActive", "==", true), orderBy("createdAt", "desc"))
+    const q = query(collection(db as any, "tasks"), where("isActive", "==", true), orderBy("createdAt", "desc"))
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Task)
   } catch {
@@ -389,7 +406,7 @@ export async function createTask(
   data: Omit<Task, "id" | "createdAt" | "applicants" | "approvedUsers" | "completedBy">,
 ) {
   try {
-    const docRef = doc(collection(db, "tasks"))
+    const docRef = doc(collection(db as any, "tasks"))
     const task: Omit<Task, "id"> = {
       ...data,
       applicants: [],
@@ -408,7 +425,7 @@ export async function createTask(
 export async function applyForTask(taskId: string, userId: string, userName: string, userEmail: string) {
   try {
     // Create application
-    const appRef = doc(collection(db, "taskApplications"))
+    const appRef = doc(collection(db as any, "taskApplications"))
     const application: Omit<TaskApplication, "id"> = {
       taskId,
       userId,
@@ -420,7 +437,7 @@ export async function applyForTask(taskId: string, userId: string, userName: str
     await setDoc(appRef, application)
 
     // Update task applicants
-    const taskRef = doc(db, "tasks", taskId)
+    const taskRef = doc(db as any, "tasks", taskId)
     const taskDoc = await getDoc(taskRef)
     if (taskDoc.exists()) {
       const applicants = taskDoc.data().applicants || []
@@ -436,7 +453,7 @@ export async function applyForTask(taskId: string, userId: string, userName: str
 
 export async function getUserTaskApplications(userId: string): Promise<TaskApplication[]> {
   try {
-    const q = query(collection(db, "taskApplications"), where("userId", "==", userId))
+    const q = query(collection(db as any, "taskApplications"), where("userId", "==", userId))
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as TaskApplication)
   } catch {
@@ -447,7 +464,7 @@ export async function getUserTaskApplications(userId: string): Promise<TaskAppli
 // Ideas functions
 export async function submitIdea(data: Omit<IdeaSubmission, "id" | "submittedAt" | "status">) {
   try {
-    const docRef = doc(collection(db, "ideas"))
+    const docRef = doc(collection(db as any, "ideas"))
     const idea: Omit<IdeaSubmission, "id"> = {
       ...data,
       status: "pending",
@@ -463,7 +480,7 @@ export async function submitIdea(data: Omit<IdeaSubmission, "id" | "submittedAt"
 
 export async function getIdeas(): Promise<IdeaSubmission[]> {
   try {
-    const q = query(collection(db, "ideas"), orderBy("submittedAt", "desc"))
+    const q = query(collection(db as any, "ideas"), orderBy("submittedAt", "desc"))
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as IdeaSubmission)
   } catch {
@@ -473,7 +490,7 @@ export async function getIdeas(): Promise<IdeaSubmission[]> {
 
 export async function getUserIdeas(userId: string): Promise<IdeaSubmission[]> {
   try {
-    const q = query(collection(db, "ideas"), where("userId", "==", userId), orderBy("submittedAt", "desc"))
+    const q = query(collection(db as any, "ideas"), where("userId", "==", userId), orderBy("submittedAt", "desc"))
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as IdeaSubmission)
   } catch {
@@ -491,7 +508,7 @@ export async function updateIdeaStatus(
   rejectionReason?: string,
 ) {
   try {
-    const docRef = doc(db, "ideas", ideaId)
+    const docRef = doc(db as any, "ideas", ideaId)
     const updateData: Record<string, unknown> = {
       status,
       reviewedAt: serverTimestamp(),
@@ -525,7 +542,7 @@ export async function updateIdeaStatus(
 // Notification functions
 export async function createNotification(data: Omit<Notification, "id" | "createdAt" | "read">) {
   try {
-    const docRef = doc(collection(db, "notifications"))
+    const docRef = doc(collection(db as any, "notifications"))
     const notification: Omit<Notification, "id"> = {
       ...data,
       read: false,
@@ -540,7 +557,7 @@ export async function createNotification(data: Omit<Notification, "id" | "create
 
 export async function getUserNotifications(userId: string): Promise<Notification[]> {
   try {
-    const q = query(collection(db, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"))
+    const q = query(collection(db as any, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"))
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Notification)
   } catch {
@@ -550,7 +567,7 @@ export async function getUserNotifications(userId: string): Promise<Notification
 
 export async function markNotificationRead(notificationId: string) {
   try {
-    const docRef = doc(db, "notifications", notificationId)
+    const docRef = doc(db as any, "notifications", notificationId)
     await updateDoc(docRef, { read: true })
     return { error: null }
   } catch {
@@ -560,7 +577,7 @@ export async function markNotificationRead(notificationId: string) {
 
 export async function markAllNotificationsRead(userId: string) {
   try {
-    const q = query(collection(db, "notifications"), where("userId", "==", userId), where("read", "==", false))
+    const q = query(collection(db as any, "notifications"), where("userId", "==", userId), where("read", "==", false))
     const querySnapshot = await getDocs(q)
     const updates = querySnapshot.docs.map((doc) => updateDoc(doc.ref, { read: true }))
     await Promise.all(updates)
@@ -573,7 +590,11 @@ export async function markAllNotificationsRead(userId: string) {
 // University Updates functions
 export async function getUniversityUpdates(): Promise<UniversityUpdate[]> {
   try {
-    const q = query(collection(db, "universityUpdates"), where("isActive", "==", true), orderBy("createdAt", "desc"))
+    const q = query(
+      collection(db as any, "universityUpdates"),
+      where("isActive", "==", true),
+      orderBy("createdAt", "desc"),
+    )
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as UniversityUpdate)
   } catch {
@@ -583,7 +604,7 @@ export async function getUniversityUpdates(): Promise<UniversityUpdate[]> {
 
 export async function createUniversityUpdate(data: Omit<UniversityUpdate, "id" | "createdAt">) {
   try {
-    const docRef = doc(collection(db, "universityUpdates"))
+    const docRef = doc(collection(db as any, "universityUpdates"))
     const update: Omit<UniversityUpdate, "id"> = {
       ...data,
       createdAt: serverTimestamp() as Timestamp,
@@ -598,7 +619,7 @@ export async function createUniversityUpdate(data: Omit<UniversityUpdate, "id" |
 // File upload
 export async function uploadFile(file: File, path: string): Promise<string | null> {
   try {
-    const storageRef = ref(storage, path)
+    const storageRef = ref(storage as any, path)
     await uploadBytes(storageRef, file)
     const url = await getDownloadURL(storageRef)
     return url
@@ -609,7 +630,7 @@ export async function uploadFile(file: File, path: string): Promise<string | nul
 
 // Real-time listeners
 export function subscribeToNotifications(userId: string, callback: (notifications: Notification[]) => void) {
-  const q = query(collection(db, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"))
+  const q = query(collection(db as any, "notifications"), where("userId", "==", userId), orderBy("createdAt", "desc"))
   return onSnapshot(q, (snapshot) => {
     const notifications = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Notification)
     callback(notifications)
@@ -617,7 +638,7 @@ export function subscribeToNotifications(userId: string, callback: (notification
 }
 
 export function subscribeToUserProfile(userId: string, callback: (profile: UserProfile | null) => void) {
-  const docRef = doc(db, "users", userId)
+  const docRef = doc(db as any, "users", userId)
   return onSnapshot(docRef, (doc) => {
     if (doc.exists()) {
       callback({ id: doc.id, ...doc.data() } as UserProfile)
@@ -628,7 +649,7 @@ export function subscribeToUserProfile(userId: string, callback: (profile: UserP
 }
 
 export function subscribeToVerifications(callback: (verifications: VerificationSubmission[]) => void) {
-  const q = query(collection(db, "verifications"), orderBy("submittedAt", "desc"))
+  const q = query(collection(db as any, "verifications"), orderBy("submittedAt", "desc"))
   return onSnapshot(q, (snapshot) => {
     const verifications = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as VerificationSubmission)
     callback(verifications)
@@ -636,7 +657,7 @@ export function subscribeToVerifications(callback: (verifications: VerificationS
 }
 
 export function subscribeToIdeas(callback: (ideas: IdeaSubmission[]) => void) {
-  const q = query(collection(db, "ideas"), orderBy("submittedAt", "desc"))
+  const q = query(collection(db as any, "ideas"), orderBy("submittedAt", "desc"))
   return onSnapshot(q, (snapshot) => {
     const ideas = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as IdeaSubmission)
     callback(ideas)
@@ -644,7 +665,7 @@ export function subscribeToIdeas(callback: (ideas: IdeaSubmission[]) => void) {
 }
 
 export function subscribeToTasks(callback: (tasks: Task[]) => void) {
-  const q = query(collection(db, "tasks"), where("isActive", "==", true), orderBy("createdAt", "desc"))
+  const q = query(collection(db as any, "tasks"), where("isActive", "==", true), orderBy("createdAt", "desc"))
   return onSnapshot(q, (snapshot) => {
     const tasks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Task)
     callback(tasks)
