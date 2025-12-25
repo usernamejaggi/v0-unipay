@@ -29,7 +29,10 @@ export function WalletCard({ balance, todayEarnings, dailyLimit }: WalletCardPro
       </CardHeader>
       <CardContent className="relative space-y-4">
         <div>
-          <p className="text-4xl font-bold animate-count-up">₹{balance.toLocaleString("en-IN")}</p>
+        <p className="text-4xl font-bold animate-count-up">
+  ₹{Number(balance ?? 0).toLocaleString("en-IN")}
+</p>
+
           <div className="flex items-center gap-1 mt-1 text-primary-foreground/70 text-sm">
             <TrendingUp className="h-3 w-3" />
             <span>+₹{todayEarnings} today</span>

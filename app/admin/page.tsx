@@ -642,7 +642,10 @@ export default function AdminPage() {
                           </td>
                           <td className="p-3 hidden sm:table-cell text-sm">{u.tasksCompleted}</td>
                           <td className="p-3 hidden sm:table-cell text-sm font-medium text-primary">
-                            ₹{u.totalEarnings.toLocaleString()}
+                          <td className="p-3 hidden sm:table-cell text-sm font-medium text-primary">
+  ₹{Number(u.totalEarnings ?? 0).toLocaleString("en-IN")}
+</td>
+
                           </td>
                         </tr>
                       ))}
