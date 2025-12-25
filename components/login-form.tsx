@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,8 +43,16 @@ export function LoginForm() {
   const [showVerification, setShowVerification] = useState(false)
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
   const router = useRouter()
   const { signIn, signUp, signInWithGoogle, profile } = useAuth()
+
+  // ✅ ADMIN REDIRECT — CORRECT PLACE
+  useEffect(() => {
+    if (profile?.isAdmin) {
+      router.push("/admin")
+    }
+  }, [profile, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,39 +61,25 @@ export function LoginForm() {
 
     try {
       if (isSignUp) {
-        // Sign up flow
         const result = await signUp(email, password, name)
         if (result.error) {
           setError(result.error)
-          setIsLoading(false)
           return
         }
-        // After signup, show verification modal
         setShowVerification(true)
-        setIsLoading(false)
         return
       }
 
-      // Sign in flow
       const result = await signIn(email, password)
-
       if (result.error) {
         setError(result.error)
-        setIsLoading(false)
-        return
-      }
-
-      setIsLoading(false)
-
-      // Redirect based on admin status
-      if (result.isAdmin) {
-        router.push("/admin")
         return
       }
 
       router.push("/dashboard")
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -96,24 +90,14 @@ export function LoginForm() {
 
     try {
       const result = await signInWithGoogle()
-
       if (result.error) {
         setError(result.error)
-        setIsGoogleLoading(false)
         return
       }
-
-      setIsGoogleLoading(false)
-
-      // Redirect based on admin status
-      if (result.isAdmin) {
-        router.push("/admin")
-        return
-      }
-
       router.push("/dashboard")
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
+    } finally {
       setIsGoogleLoading(false)
     }
   }
@@ -130,161 +114,51 @@ export function LoginForm() {
           onClick={handleGoogleSignIn}
           disabled={isGoogleLoading || isLoading}
         >
-          {isGoogleLoading ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Signing in...
-            </span>
-          ) : (
-            <>
-              <GoogleIcon className="h-5 w-5" />
-              Continue with Google
-            </>
-          )}
+          {isGoogleLoading ? "Signing in..." : <> <GoogleIcon className="h-5 w-5" /> Continue with Google </>}
         </Button>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
-          </div>
-        </div>
 
         <div className="space-y-4">
           {isSignUp && (
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <div className="relative group">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Your full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="pl-10"
-                  required={isSignUp}
-                />
-              </div>
+            <div>
+              <Label>Full Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">College Email</Label>
-            <div className="relative group">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@university.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Use your .edu or official college email
-              {isAdminEmail && <span className="block mt-1 text-primary/70">Admin login detected</span>}
-            </p>
+          <div>
+            <Label>Email</Label>
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+            {isAdminEmail && <p className="text-xs text-primary">Admin login detected</p>}
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <a href="#" className="text-sm text-primary hover:underline">
-                Forgot password?
-              </a>
-            </div>
-            <div className="relative group">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pl-10"
-                required
-                minLength={6}
-              />
-            </div>
+          <div>
+            <Label>Password</Label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
         </div>
 
-        {error && (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
-            {error}
-          </div>
-        )}
+        {error && <div className="text-red-500 text-sm">{error}</div>}
 
-        <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  fill="none"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              {isSignUp ? "Creating account..." : "Signing in..."}
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              {isSignUp ? "Create Account" : "Sign in"} <ArrowRight className="h-4 w-4" />
-            </span>
-          )}
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
         </Button>
 
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(!isSignUp)
-              setError(null)
-            }}
-            className="text-sm text-primary hover:underline"
-          >
-            {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setIsSignUp(!isSignUp)
+            setError(null)
+          }}
+          className="text-sm underline"
+        >
+          {isSignUp ? "Already have an account?" : "Create an account"}
+        </button>
       </form>
 
       <VerificationModal
         open={showVerification}
         onOpenChange={setShowVerification}
-        onSubmit={() => {
-          setTimeout(() => {
-            router.push("/dashboard")
-          }, 500)
-        }}
+        onSubmit={() => router.push("/dashboard")}
       />
     </>
   )

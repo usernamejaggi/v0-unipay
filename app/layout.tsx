@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/contexts/auth-context"
+import { AuthGuard } from "@/components/auth/auth-gaurd"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -32,14 +33,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
-        <Analytics />
+        <AuthProvider>
+          <AuthGuard>
+            {children}
+            <Analytics />
+          </AuthGuard>
+        </AuthProvider>
       </body>
     </html>
   )

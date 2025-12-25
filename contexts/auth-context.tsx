@@ -12,13 +12,11 @@ import {
   updateUserProfile,
   subscribeToUserProfile,
   subscribeToNotifications,
-  onAuthStateChanged,
-  type User,
   type UserProfile,
   type Notification,
   ADMIN_EMAILS,
-  ADMIN_PASSWORD,
 } from "@/lib/firebase"
+import { onAuthStateChanged, type User } from "firebase/auth"
 
 interface AuthContextType {
   user: User | null
@@ -63,27 +61,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe()
   }, [])
 
-  // Subscribe to real-time profile updates
   useEffect(() => {
-    if (!user) return
-
-    const unsubscribe = subscribeToUserProfile(user.uid, (updatedProfile) => {
-      setProfile(updatedProfile)
+    let unsubscribeProfile: (() => void) | null = null
+    let unsubscribeNotifications: (() => void) | null = null
+  
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser)
+  
+      // Clean up old listeners
+      if (unsubscribeProfile) unsubscribeProfile()
+      if (unsubscribeNotifications) unsubscribeNotifications()
+  
+      if (firebaseUser) {
+        const userProfile = await getUserProfile(firebaseUser.uid)
+        setProfile(userProfile)
+  
+        unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, setProfile)
+        unsubscribeNotifications = subscribeToNotifications(
+          firebaseUser.uid,
+          setNotifications,
+        )
+      } else {
+        setProfile(null)
+        setNotifications([])
+      }
+  
+      setLoading(false)
     })
-
-    return () => unsubscribe()
-  }, [user])
-
-  // Subscribe to real-time notifications
-  useEffect(() => {
-    if (!user) return
-
-    const unsubscribe = subscribeToNotifications(user.uid, (newNotifications) => {
-      setNotifications(newNotifications)
-    })
-
-    return () => unsubscribe()
-  }, [user])
+  
+    return () => {
+      unsubscribeAuth()
+      if (unsubscribeProfile) unsubscribeProfile()
+      if (unsubscribeNotifications) unsubscribeNotifications()
+    }
+  }, [])
+  
 
   const handleSignIn = async (email: string, password: string) => {
     setError(null)
@@ -91,13 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Check if admin login
-      const isAdminEmail = ADMIN_EMAILS.includes(email.toLowerCase())
+      const isAdminEmail = ADMIN_EMAILS.includes((auth.currentUser?.email || "").toLowerCase())
+
 
       // For admin, check password matches
-      if (isAdminEmail && password !== ADMIN_PASSWORD) {
-        setLoading(false)
-        return { success: false, isAdmin: false, error: "Invalid admin password" }
-      }
 
       const result = await signIn(email, password)
 
@@ -159,9 +168,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleLogOut = async () => {
     await logOut()
+    setUser(null)
     setProfile(null)
     setNotifications([])
   }
+  
 
   const handleUpdateProfile = async (data: Partial<UserProfile>) => {
     if (!user) return { error: "Not authenticated" }

@@ -317,32 +317,33 @@ export async function getAllUsers(): Promise<UserProfile[]> {
 }
 
 // Verification functions
-export async function submitVerification(data: Omit<VerificationSubmission, "id" | "submittedAt" | "status">) {
-  try {
-    const docRef = doc(collection(db as any, "verifications"))
-    const verification: Omit<VerificationSubmission, "id"> = {
-      ...data,
-      status: "under-review",
-      submittedAt: serverTimestamp() as Timestamp,
-    }
-    await setDoc(docRef, verification)
+export async function submitVerification(
+  data: Omit<VerificationSubmission, "id" | "submittedAt" | "status">
+): Promise<string> {
+  if (!db) throw new Error("Firestore not initialized")
 
-    // Update user's verification status
-    await updateUserProfile(data.userId, { verificationStatus: "under-review" })
+  const docRef = doc(db, "verifications", data.userId)
 
-    // Create notification
-    await createNotification({
-      userId: data.userId,
-      title: "Verification Submitted",
-      message: "Your verification documents have been submitted for review.",
-      type: "verification",
-    })
-
-    return { id: docRef.id, error: null }
-  } catch (error: unknown) {
-    const firebaseError = error as { message?: string }
-    return { id: null, error: firebaseError.message || "Failed to submit verification" }
+  const verification: Omit<VerificationSubmission, "id"> = {
+    ...data,
+    status: "under-review",
+    submittedAt: serverTimestamp() as Timestamp,
   }
+
+  await setDoc(docRef, verification)
+
+  await updateUserProfile(data.userId, {
+    verificationStatus: "under-review",
+  })
+
+  await createNotification({
+    userId: data.userId,
+    title: "Verification Submitted",
+    message: "Your verification documents have been submitted for review.",
+    type: "verification",
+  })
+
+  return docRef.id
 }
 
 export async function getVerifications(): Promise<VerificationSubmission[]> {

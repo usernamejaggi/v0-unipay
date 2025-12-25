@@ -186,7 +186,6 @@ export function VerificationModal({ open, onOpenChange, onSubmit }: Verification
         interests: selectedInterests,
         selfieUrl,
         idCardUrl,
-        verificationStatus: "under-review",
       })
 
       setIsSubmitting(false)

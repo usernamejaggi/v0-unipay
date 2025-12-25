@@ -171,10 +171,15 @@ export function Header({ onMenuClick }: HeaderProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2 px-2">
-                  <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-                    <AvatarImage src={profile?.avatar || ""} alt={displayName} />
-                    <AvatarFallback className="bg-primary/10 text-primary">{getInitials()}</AvatarFallback>
-                  </Avatar>
+                <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+  {profile?.avatar ? (
+    <AvatarImage src={profile.avatar} alt={displayName} />
+  ) : null}
+  <AvatarFallback className="bg-primary/10 text-primary">
+    {getInitials()}
+  </AvatarFallback>
+</Avatar>
+
                   <div className="hidden md:flex flex-col items-start">
                     <div className="flex items-center gap-1">
                       <span className="text-sm font-medium">{displayName}</span>
